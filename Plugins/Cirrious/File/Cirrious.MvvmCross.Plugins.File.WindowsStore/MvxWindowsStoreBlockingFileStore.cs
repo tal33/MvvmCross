@@ -5,15 +5,18 @@
 // 
 // Project Lead - Stuart Lodge, @slodge, me@slodge.com
 
+
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Cirrious.CrossCore;
 using Cirrious.CrossCore.Exceptions;
 using Cirrious.CrossCore.Platform;
 using Cirrious.CrossCore.WindowsStore.Platform;
 using Windows.Storage;
+
 
 namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
 {
@@ -26,13 +29,13 @@ namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
         {
             string result = null;
             var toReturn = TryReadFileCommon(path, (stream) =>
+            {
+                using (var streamReader = new StreamReader(stream))
                 {
-                    using (var streamReader = new StreamReader(stream))
-                    {
-                        result = streamReader.ReadToEnd();
-                    }
-                    return true;
-                });
+                    result = streamReader.ReadToEnd();
+                }
+                return true;
+            });
             contents = result;
             return toReturn;
         }
@@ -41,17 +44,18 @@ namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
         {
             Byte[] result = null;
             var toReturn = TryReadFileCommon(path, (stream) =>
+            {
+                using (var binaryReader = new BinaryReader(stream))
                 {
-                    using (var binaryReader = new BinaryReader(stream))
-                    {
-                        var memoryBuffer = new byte[stream.Length];
-                        if (binaryReader.Read(memoryBuffer, 0, memoryBuffer.Length) != memoryBuffer.Length)
-                            return false;
+                    var memoryBuffer = new byte[stream.Length];
+                    if (binaryReader.Read(memoryBuffer, 0, memoryBuffer.Length) != memoryBuffer.Length)
+                        return false;
 
-                        result = memoryBuffer;
-                        return true;
-                    }
-                });
+
+                    result = memoryBuffer;
+                    return true;
+                }
+            });
             contents = result;
             return toReturn;
         }
@@ -65,25 +69,25 @@ namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
         public void WriteFile(string path, string contents)
         {
             WriteFileCommon(path, (stream) =>
+            {
+                using (var sw = new StreamWriter(stream))
                 {
-                    using (var sw = new StreamWriter(stream))
-                    {
-                        sw.Write(contents);
-                        sw.Flush();
-                    }
-                });
+                    sw.Write(contents);
+                    sw.Flush();
+                }
+            });
         }
 
         public void WriteFile(string path, IEnumerable<byte> contents)
         {
             WriteFileCommon(path, (stream) =>
+            {
+                using (var binaryWriter = new BinaryWriter(stream))
                 {
-                    using (var binaryWriter = new BinaryWriter(stream))
-                    {
-                        binaryWriter.Write(contents.ToArray());
-                        binaryWriter.Flush();
-                    }
-                });
+                    binaryWriter.Write(contents.ToArray());
+                    binaryWriter.Flush();
+                }
+            });
         }
 
         public void WriteFile(string path, Action<System.IO.Stream> writeMethod)
@@ -97,6 +101,11 @@ namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
             {
                 StorageFile fromFile;
 
+                if (Exists(from) == false)
+                {
+                    return false;
+                }
+
                 try
                 {
                     fromFile = StorageFileFromRelativePath(from);
@@ -106,13 +115,20 @@ namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
                     return false;
                 }
 
+
                 if (deleteExistingTo)
                 {
-                    if (!SafeDeleteFile(to))
+                    try
+                    {
+                        var toFile = StorageFileFromRelativePath(to);
+                        toFile.DeleteAsync().Await();
+                    }
+                    catch (FileNotFoundException)
                     {
                         return false;
                     }
                 }
+
 
                 var fullToPath = ToFullPath(to);
                 var toDirectory = Path.GetDirectoryName(fullToPath);
@@ -132,8 +148,15 @@ namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
         {
             try
             {
-                var storageFile = StorageFileFromRelativePath(path);
-                return storageFile != null;
+                if (Path.IsPathRooted(path) == false)
+                {
+                    path = ToFullPath(path);
+                }
+
+                var fileName = Path.GetFileName(path);
+                var directoryPath = Path.GetDirectoryName(path);
+                var directory = StorageFolder.GetFolderFromPathAsync(directoryPath).Await();
+                return directory.GetFilesAsync().Await().Any(x => x.Name == fileName);
             }
             catch (FileNotFoundException)
             {
@@ -143,13 +166,21 @@ namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
 
         public bool FolderExists(string folderPath)
         {
-            // contributed by @AlexMortola via Stackoverflow creative commons
-            // http://stackoverflow.com/questions/19890756/mvvmcross-notimplementedexception-calling-ensurefolderexists-method-of-imvxfile
             try
             {
-                var directory = ToFullPath(folderPath);
-                var storageFolder = StorageFolder.GetFolderFromPathAsync(directory).Await();
-                return true;
+                if (Path.IsPathRooted(folderPath) == false)
+                {
+                    folderPath = ToFullPath(folderPath);
+                }
+
+                folderPath = folderPath.TrimEnd('\\');
+
+                var parent = Path.GetDirectoryName(folderPath);
+                var parentFolder = StorageFolder.GetFolderFromPathAsync(parent).Await();
+
+                var leafFolder = Path.GetFileName(folderPath);
+
+                return parentFolder.GetFoldersAsync().Await().Any(x => x.Name == leafFolder);
             }
             catch (FileNotFoundException)
             {
@@ -174,9 +205,11 @@ namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
             if (FolderExists(folderPath))
                 return;
 
+
             // note that this does not work recursively
             if (folderPath.Contains("\\") || folderPath.Contains("/"))
                 Mvx.Warning("WindowsStore EnsureFolderExists implementation can't yet cope with nested paths");
+
 
             var rootFolder = ToFullPath(string.Empty);
             var storageFolder = StorageFolder.GetFolderFromPathAsync(rootFolder).Await();
@@ -219,15 +252,11 @@ namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
 
         #endregion
 
-        private static void WriteFileCommon(string path, Action<Stream> streamAction)
+        private void WriteFileCommon(string path, Action<Stream> streamAction)
         {
-            // from https://github.com/MvvmCross/MvvmCross/issues/500 we delete any existing file
-            // before writing the new one
-            SafeDeleteFile(path);
-
             try
             {
-                var storageFile = CreateStorageFileFromRelativePath(path);
+                StorageFile storageFile = CreateStorageFileFromRelativePath(path);
                 var streamWithContentType = storageFile.OpenAsync(FileAccessMode.ReadWrite).Await();
                 var stream = streamWithContentType.AsStreamForWrite();
                 streamAction(stream);
@@ -239,7 +268,7 @@ namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
             }
         }
 
-        private static bool TryReadFileCommon(string path, Func<Stream, bool> streamAction)
+        private bool TryReadFileCommon(string path, Func<Stream, bool> streamAction)
         {
             try
             {
@@ -255,29 +284,20 @@ namespace Cirrious.MvvmCross.Plugins.File.WindowsStore
             }
         }
 
-        private static bool SafeDeleteFile(string path)
-        {
-            try
-            {
-                var toFile = StorageFileFromRelativePath(path);
-                toFile.DeleteAsync().Await();
-                return true;
-            }
-            catch (FileNotFoundException)
-            {
-                return false;
-            }
-        }
-
-        private static StorageFile StorageFileFromRelativePath(string path)
+        private StorageFile StorageFileFromRelativePath(string path)
         {
             var fullPath = ToFullPath(path);
             var storageFile = StorageFile.GetFileFromPathAsync(fullPath).Await();
             return storageFile;
         }
 
-        private static StorageFile CreateStorageFileFromRelativePath(string path)
+        private StorageFile CreateStorageFileFromRelativePath(string path)
         {
+            if (Exists(path))
+            {
+                return StorageFile.GetFileFromPathAsync(path).Await();
+            }
+
             var fullPath = ToFullPath(path);
             var directory = Path.GetDirectoryName(fullPath);
             var fileName = Path.GetFileName(fullPath);
