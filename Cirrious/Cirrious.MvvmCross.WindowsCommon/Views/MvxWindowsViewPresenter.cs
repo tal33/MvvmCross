@@ -11,15 +11,16 @@ using Cirrious.CrossCore.Exceptions;
 using Cirrious.CrossCore.Platform;
 using Cirrious.MvvmCross.ViewModels;
 using Cirrious.MvvmCross.Views;
+using Cirrious.MvvmCross.WindowsCommon.Platform;
 
 namespace Cirrious.MvvmCross.WindowsCommon.Views
 {
     public class MvxWindowsViewPresenter
         : IMvxWindowsViewPresenter
     {
-        private readonly MvxWindowsFrame _rootFrame;
+        private readonly IMvxWindowsFrame _rootFrame;
 
-        public MvxWindowsViewPresenter(MvxWindowsFrame rootFrame)
+        public MvxWindowsViewPresenter(IMvxWindowsFrame rootFrame)
         {
             _rootFrame = rootFrame;
         }
@@ -50,7 +51,7 @@ namespace Cirrious.MvvmCross.WindowsCommon.Views
             MvxTrace.Warning("Hint ignored {0}", hint.GetType().Name);
         }
 
-        public virtual async void Close(IMvxViewModel viewModel)
+        public virtual void Close(IMvxViewModel viewModel)
         {
             var currentView = _rootFrame.Content as IMvxView;
             if (currentView == null)
@@ -71,7 +72,7 @@ namespace Cirrious.MvvmCross.WindowsCommon.Views
                 return;
             }
 
-            await _rootFrame.GoBackAsync();
+            _rootFrame.GoBack();
         }
     }
 }

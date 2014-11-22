@@ -14,6 +14,7 @@ using Windows.UI.Xaml.Media.Animation;
 using Windows.UI.Xaml.Navigation;
 using Cirrious.CrossCore;
 using Cirrious.MvvmCross.ViewModels;
+using Cirrious.MvvmCross.WindowsCommon.Platform;
 using Cirrious.MvvmCross.WindowsCommon.Views.Animation;
 using Cirrious.MvvmCross.WindowsCommon.Views.Handlers;
 using Cirrious.MvvmCross.WindowsCommon.Views.Suspension;
@@ -23,7 +24,7 @@ namespace Cirrious.MvvmCross.WindowsCommon.Views
     public delegate void NavigatedEventHandler(object sender, MvxWindowsNavigationEventArgs e);
 
     /// <summary>Navigation container for pages. </summary>
-    public class MvxWindowsFrame : Control, INavigate
+    public class MvxWindowsFrame : Control, INavigate, IMvxWindowsFrame
     {
         private int _currentIndex = -1;
         private IPageAnimation _pageAnimation;
@@ -481,5 +482,15 @@ namespace Cirrious.MvvmCross.WindowsCommon.Views
         {
             get { return _currentIndex + 1; }
         }
+
+
+
+        public void GoBack()
+        {
+            // not awaited - just kicks off the back Task
+            GoBackAsync();
+        }
+
+        public Control UnderlyingControl { get { return this; } }
     }
 }

@@ -5,7 +5,11 @@
 // 
 // Project Lead - Stuart Lodge, @slodge, me@slodge.com
 
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Windows.UI.Core;
+using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Cirrious.CrossCore;
 using Cirrious.CrossCore.Platform;
@@ -18,12 +22,86 @@ using Cirrious.MvvmCross.WindowsCommon.Views.Suspension;
 
 namespace Cirrious.MvvmCross.WindowsCommon.Platform
 {
+    public interface IMvxWindowsFrame
+    {
+        Control UnderlyingControl { get; }
+        CoreDispatcher Dispatcher { get; }
+        object Content { get; }
+        bool CanGoBack { get; }
+        bool Navigate(Type viewType, object parameter);
+        void GoBack();
+        void ClearValue(DependencyProperty property);
+        object GetValue(DependencyProperty property);
+        void SetValue(DependencyProperty property, object value);
+        void SetNavigationState(string state);
+        string GetNavigationState();
+    }
+
+
+
+    public class MvxFrameAdapter : IMvxWindowsFrame
+    {
+        private readonly Frame _frame;
+
+        public MvxFrameAdapter(Frame frame)
+        {
+            _frame = frame;
+        }
+
+        public Control UnderlyingControl { get { return _frame; } }
+
+        public CoreDispatcher Dispatcher { get { return _frame.Dispatcher; } }
+        public object Content { get { return _frame.Content; } }
+        public bool CanGoBack { get { return _frame.CanGoBack; } }
+
+        public bool Navigate(Type viewType, object parameter)
+        {
+            return _frame.Navigate(viewType, parameter);
+        }
+
+        public void GoBack()
+        {
+            _frame.GoBack();
+        }
+
+        public void ClearValue(DependencyProperty property)
+        {
+            _frame.ClearValue(property);
+;        }
+
+
+        public object GetValue(DependencyProperty property)
+        {
+            return _frame.GetValue(property);
+        }
+
+        public void SetValue(DependencyProperty property, object value)
+        {
+            _frame.SetValue(property, value);
+        }
+
+        public void SetNavigationState(string state)
+        {
+            _frame.SetNavigationState(state);
+        }
+
+        public string GetNavigationState()
+        {
+            return _frame.GetNavigationState();
+        }
+    }
+
     public abstract class MvxWindowsSetup
         : MvxSetup
     {
-        private readonly MvxWindowsFrame _rootFrame;
+        private readonly IMvxWindowsFrame _rootFrame;
 
-        protected MvxWindowsSetup(MvxWindowsFrame rootFrame)
+        protected MvxWindowsSetup(Frame rootFrame)
+            : this(new MvxFrameAdapter(rootFrame))
+        {
+        }
+
+        protected MvxWindowsSetup(IMvxWindowsFrame rootFrame)
         {
             _rootFrame = rootFrame;
         }
@@ -70,12 +148,12 @@ namespace Cirrious.MvvmCross.WindowsCommon.Platform
             return CreateViewDispatcher(_rootFrame);
         }
 
-        protected virtual IMvxWindowsViewPresenter CreateViewPresenter(MvxWindowsFrame rootFrame)
+        protected virtual IMvxWindowsViewPresenter CreateViewPresenter(IMvxWindowsFrame rootFrame)
         {
             return new MvxWindowsViewPresenter(rootFrame);
         }
 
-        protected virtual MvxWindowsViewDispatcher CreateViewDispatcher(MvxWindowsFrame rootFrame)
+        protected virtual MvxWindowsViewDispatcher CreateViewDispatcher(IMvxWindowsFrame rootFrame)
         {
             var presenter = CreateViewPresenter(_rootFrame);
             return new MvxWindowsViewDispatcher(presenter, rootFrame);
