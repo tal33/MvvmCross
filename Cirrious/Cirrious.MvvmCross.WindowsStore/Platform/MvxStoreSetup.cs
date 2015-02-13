@@ -5,9 +5,6 @@
 // 
 // Project Lead - Stuart Lodge, @slodge, me@slodge.com
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using Cirrious.CrossCore;
 using Cirrious.CrossCore.Platform;
 using Cirrious.CrossCore.Plugins;
@@ -24,10 +21,12 @@ namespace Cirrious.MvvmCross.WindowsStore.Platform
         : MvxSetup
     {
         private readonly Frame _rootFrame;
+        private readonly string _suspensionManagerSessionStateKey;
 
-        protected MvxStoreSetup(Frame rootFrame)
+        protected MvxStoreSetup(Frame rootFrame, string suspensionManagerSessionStateKey = null)
         {
             _rootFrame = rootFrame;
+            _suspensionManagerSessionStateKey = suspensionManagerSessionStateKey;
         }
 
         protected override IMvxTrace CreateDebugTrace()
@@ -45,6 +44,9 @@ namespace Cirrious.MvvmCross.WindowsStore.Platform
         {
             var suspensionManager = CreateSuspensionManager();
             Mvx.RegisterSingleton(suspensionManager);
+
+            if (_suspensionManagerSessionStateKey != null)
+                suspensionManager.RegisterFrame(_rootFrame, _suspensionManagerSessionStateKey);
         }
 
         protected virtual IMvxSuspensionManager CreateSuspensionManager()

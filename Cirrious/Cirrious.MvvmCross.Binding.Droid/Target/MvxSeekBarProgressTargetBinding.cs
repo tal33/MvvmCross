@@ -1,4 +1,4 @@
-// MvxSeekBarProgressTargetBinging.cs
+// MvxSeekBarProgressTargetBinding.cs
 // (c) Copyright Cirrious Ltd. http://www.cirrious.com
 // MvvmCross is licensed using Microsoft Public License (Ms-PL)
 // Contributions and inspirations noted in readme.md and license.txt
@@ -12,10 +12,10 @@ using Cirrious.MvvmCross.Binding.Bindings.Target;
 
 namespace Cirrious.MvvmCross.Binding.Droid.Target
 {
-    public class MvxSeekBarProgressTargetBinging 
+    public class MvxSeekBarProgressTargetBinding 
         : MvxPropertyInfoTargetBinding<SeekBar>
     {
-        public MvxSeekBarProgressTargetBinging(object target, PropertyInfo targetPropertyInfo)
+		public MvxSeekBarProgressTargetBinding(object target, PropertyInfo targetPropertyInfo)
             : base(target, targetPropertyInfo)
         {
         }
@@ -38,32 +38,10 @@ namespace Cirrious.MvvmCross.Binding.Droid.Target
             seekbar.Progress = (int) value;
         }
 
-        public class SeekBarChangeListener :
-            Java.Lang.Object
-            , SeekBar.IOnSeekBarChangeListener
+        private void SeekBarProgressChanged(object sender, SeekBar.ProgressChangedEventArgs e)
         {
-            private readonly MvxSeekBarProgressTargetBinging _parent;
-
-            public SeekBarChangeListener(MvxSeekBarProgressTargetBinging parent)
-            {
-                _parent = parent;
-            }
-
-            public void OnProgressChanged(SeekBar seekBar, int progress, bool fromUser)
-            {
-                if (fromUser)
-                    _parent.FireValueChanged(progress);
-            }
-
-            public void OnStartTrackingTouch(SeekBar seekBar)
-            {
-                // ignore
-            }
-
-            public void OnStopTrackingTouch(SeekBar seekBar)
-            {
-                // ignore
-            }
+            if (e.FromUser)
+                FireValueChanged(e.Progress);
         }
 
         public override MvxBindingMode DefaultMode
@@ -76,11 +54,11 @@ namespace Cirrious.MvvmCross.Binding.Droid.Target
             var seekBar = View;
             if (seekBar == null)
             {
-                MvxBindingTrace.Trace(MvxTraceLevel.Error, "Error - SeekBar is null in MvxSeekBarProgressTargetBinging");
+				MvxBindingTrace.Trace(MvxTraceLevel.Error, "Error - SeekBar is null in MvxSeekBarProgressTargetBinding");
                 return;
             }
 
-            seekBar.SetOnSeekBarChangeListener(new SeekBarChangeListener(this));
+            seekBar.ProgressChanged += SeekBarProgressChanged;
             _subscribed = true;
         }
 
@@ -91,7 +69,7 @@ namespace Cirrious.MvvmCross.Binding.Droid.Target
                 var view = View;
                 if (view != null && _subscribed)
                 {
-                    view.SetOnSeekBarChangeListener(null);
+                    view.ProgressChanged -= SeekBarProgressChanged;
                     _subscribed = false;
                 }
             }
